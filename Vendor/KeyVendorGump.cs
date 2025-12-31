@@ -8,20 +8,22 @@ using Server.Network;
 namespace Server.Gumps
 {
     /// <summary>
-    /// Player-facing gump for purchasing storage keys
+    /// Player-facing gump for purchasing storage keys - Modern Style
     /// </summary>
     public class KeyVendorGump : Gump
     {
         private Mobile _from;
         private KeyVendorStone _stone;
         private int _page;
-        private const int EntriesPerPage = 10;
+        private const int EntriesPerPage = 8;
 
-        // Colors
-        private const int TitleColor = 0xFFFFFF;
-        private const int LabelColor = 0xFFFFFF;
-        private const int PriceColor = 0x00FF00;
-        private const int DisabledColor = 0x808080;
+        // Modern Color Palette
+        private const int HeaderColor = 0x00BFFF;    // Deep Sky Blue
+        private const int TitleColor = 0xFFFFFF;     // White
+        private const int LabelColor = 0xE0E0E0;     // Light Gray
+        private const int PriceColor = 0x7CFC00;     // Lawn Green
+        private const int AccentColor = 0xFFD700;    // Gold
+        private const int SubtleColor = 0x808080;    // Gray
 
         public KeyVendorGump(Mobile from, KeyVendorStone stone, int page) : base(50, 50)
         {
@@ -36,27 +38,34 @@ namespace Server.Gumps
 
         private void BuildGump()
         {
-            int width = 500;
-            int height = 450;
+            int width = 520;
+            int height = 480;
 
             AddPage(0);
 
-            // Background
-            AddBackground(0, 0, width, height, 9270);
+            // Main background with dark theme
+            AddBackground(0, 0, width, height, 9200);
+            
+            // Inner panel
+            AddBackground(10, 10, width - 20, height - 20, 9270);
+            
+            // Header area
+            AddBackground(20, 20, width - 40, 50, 9200);
+            AddAlphaRegion(22, 22, width - 44, 46);
+            
+            // Title with icon
+            AddImage(30, 28, 0x1F14); // Key icon
+            AddHtml(70, 32, width - 100, 25, Center(Color($"⚿ {_stone.VendorName} ⚿", HeaderColor)), false, false);
 
-            // Title bar
-            AddBackground(10, 10, width - 20, 30, 9270);
-            AddHtml(20, 17, width - 40, 20, Center(Color(_stone.VendorName, TitleColor)), false, false);
+            // Subtitle
+            AddHtml(20, 75, width - 40, 20, Center(Color("Select a storage key to purchase", SubtleColor)), false, false);
 
-            // Column headers
-            int y = 50;
-            AddHtml(30, y, 200, 20, Color("Key Name", LabelColor), false, false);
-            AddHtml(250, y, 100, 20, Color("Price", LabelColor), false, false);
-            AddHtml(380, y, 80, 20, Color("Purchase", LabelColor), false, false);
-
-            // Divider
-            y += 25;
-            AddImageTiled(20, y, width - 40, 2, 9274);
+            // Column headers with modern styling
+            int y = 100;
+            AddBackground(20, y, width - 40, 25, 9200);
+            AddHtml(50, y + 4, 200, 20, Color("Key Type", AccentColor), false, false);
+            AddHtml(280, y + 4, 100, 20, Color("Price", AccentColor), false, false);
+            AddHtml(400, y + 4, 80, 20, Color("Action", AccentColor), false, false);
 
             // Get enabled entries only for players
             List<int> enabledIndices = new List<int>();
@@ -72,52 +81,68 @@ namespace Server.Gumps
             int startIndex = _page * EntriesPerPage;
             int endIndex = Math.Min(startIndex + EntriesPerPage, enabledIndices.Count);
 
-            y += 10;
+            y += 35;
 
-            // Display entries
+            // Display entries with alternating backgrounds
             for (int i = startIndex; i < endIndex; i++)
             {
                 int entryIndex = enabledIndices[i];
                 KeyVendorEntry entry = _stone.Entries[entryIndex];
 
+                // Alternating row background
+                if ((i - startIndex) % 2 == 0)
+                {
+                    AddAlphaRegion(22, y - 2, width - 44, 36);
+                }
+
                 // Key icon
-                AddItem(30, y - 5, entry.ItemId, entry.Hue);
+                AddItem(30, y - 2, entry.ItemId, entry.Hue);
 
                 // Key name
-                AddHtml(70, y, 170, 20, Color(entry.Name, LabelColor), false, false);
+                AddHtml(75, y + 5, 190, 20, Color(entry.Name, LabelColor), false, false);
 
-                // Price
-                AddHtml(250, y, 100, 20, Color($"{entry.Price:N0} gp", PriceColor), false, false);
+                // Price with gold icon
+                AddImage(275, y + 2, 0x0E79); // Gold pile icon
+                AddHtml(300, y + 5, 90, 20, Color($"{entry.Price:N0}", PriceColor), false, false);
 
-                // Purchase button
-                AddButton(400, y, 4005, 4007, 100 + entryIndex, GumpButtonType.Reply, 0);
+                // Modern purchase button
+                AddButton(410, y + 2, 4029, 4031, 100 + entryIndex, GumpButtonType.Reply, 0);
+                AddHtml(445, y + 5, 50, 20, Color("Buy", LabelColor), false, false);
 
-                y += 30;
+                y += 38;
             }
 
-            // Footer with page navigation
-            y = height - 50;
-            AddImageTiled(20, y - 10, width - 40, 2, 9274);
+            // Footer section
+            y = height - 90;
+            AddBackground(20, y, width - 40, 2, 9274);
 
-            // Page info
-            AddHtml(width / 2 - 50, y, 100, 20, Center(Color($"Page {_page + 1} of {totalPages}", LabelColor)), false, false);
+            y += 15;
 
-            // Previous page button
+            // Page navigation with modern styling
+            AddHtml(width / 2 - 60, y, 120, 20, Center(Color($"Page {_page + 1} of {totalPages}", SubtleColor)), false, false);
+
+            y += 25;
+
+            // Navigation buttons
             if (_page > 0)
             {
-                AddButton(30, y, 4014, 4016, 1, GumpButtonType.Reply, 0);
-                AddHtml(65, y, 60, 20, Color("Previous", LabelColor), false, false);
+                AddButton(100, y, 4014, 4016, 1, GumpButtonType.Reply, 0);
+                AddHtml(135, y + 2, 80, 20, Color("◄ Previous", LabelColor), false, false);
             }
 
-            // Next page button
             if (_page < totalPages - 1)
             {
-                AddButton(width - 90, y, 4005, 4007, 2, GumpButtonType.Reply, 0);
-                AddHtml(width - 140, y, 60, 20, Color("Next", LabelColor), false, false);
+                AddButton(width - 150, y, 4005, 4007, 2, GumpButtonType.Reply, 0);
+                AddHtml(width - 115, y + 2, 80, 20, Color("Next ►", LabelColor), false, false);
             }
 
             // Close button
-            AddButton(width / 2 - 30, height - 30, 4017, 4019, 0, GumpButtonType.Reply, 0);
+            AddButton(width / 2 - 40, height - 45, 4020, 4022, 0, GumpButtonType.Reply, 0);
+            AddHtml(width / 2 - 5, height - 43, 50, 20, Color("Close", LabelColor), false, false);
+
+            // Gold balance display
+            int balance = Mobiles.Banker.GetBalance(_from);
+            AddHtml(20, height - 45, 200, 20, Color($"💰 Your Gold: {balance:N0}", AccentColor), false, false);
         }
 
         public override void OnResponse(NetState sender, in RelayInfo info)
@@ -181,7 +206,7 @@ namespace Server.Gumps
     }
 
     /// <summary>
-    /// Confirmation gump for purchasing a key
+    /// Modern confirmation gump for purchasing a key
     /// </summary>
     public class KeyVendorConfirmGump : Gump
     {
@@ -208,32 +233,37 @@ namespace Server.Gumps
             if (entry == null)
                 return;
 
-            int width = 300;
-            int height = 180;
+            int width = 320;
+            int height = 220;
 
             AddPage(0);
 
-            AddBackground(0, 0, width, height, 9270);
+            // Modern dark background
+            AddBackground(0, 0, width, height, 9200);
+            AddBackground(10, 10, width - 20, height - 20, 9270);
 
-            AddHtml(20, 20, width - 40, 20, "<CENTER><BASEFONT COLOR=#FFFFFF>Confirm Purchase</BASEFONT></CENTER>", false, false);
+            // Header
+            AddBackground(20, 20, width - 40, 35, 9200);
+            AddAlphaRegion(22, 22, width - 44, 31);
+            AddHtml(20, 28, width - 40, 25, "<CENTER><BASEFONT COLOR=#00BFFF>⚿ Confirm Purchase ⚿</BASEFONT></CENTER>", false, false);
 
-            AddImageTiled(20, 45, width - 40, 2, 9274);
+            // Key display area
+            AddBackground(20, 65, width - 40, 70, 9350);
+            AddItem(35, 75, entry.ItemId, entry.Hue);
+            AddHtml(85, 78, 180, 20, $"<BASEFONT COLOR=#FFFFFF>{entry.Name}</BASEFONT>", false, false);
+            
+            AddImage(85, 100, 0x0E79); // Gold icon
+            AddHtml(110, 103, 150, 20, $"<BASEFONT COLOR=#7CFC00>{entry.Price:N0} gold</BASEFONT>", false, false);
 
-            // Key info
-            AddItem(30, 60, entry.ItemId, entry.Hue);
-            AddHtml(70, 65, 200, 20, $"<BASEFONT COLOR=#FFFFFF>{entry.Name}</BASEFONT>", false, false);
+            // Confirmation message
+            AddHtml(20, 145, width - 40, 25, "<CENTER><BASEFONT COLOR=#E0E0E0>Proceed with purchase?</BASEFONT></CENTER>", false, false);
 
-            AddHtml(70, 90, 200, 20, $"<BASEFONT COLOR=#00FF00>Price: {entry.Price:N0} gold</BASEFONT>", false, false);
+            // Modern buttons
+            AddButton(50, height - 50, 4023, 4025, 1, GumpButtonType.Reply, 0);
+            AddHtml(85, height - 48, 60, 20, "<BASEFONT COLOR=#7CFC00>✓ Yes</BASEFONT>", false, false);
 
-            AddHtml(20, 115, width - 40, 20, "<CENTER><BASEFONT COLOR=#FFFFFF>Are you sure you want to purchase this key?</BASEFONT></CENTER>", false, false);
-
-            // Confirm button
-            AddButton(60, height - 40, 4005, 4007, 1, GumpButtonType.Reply, 0);
-            AddHtml(95, height - 38, 50, 20, "<BASEFONT COLOR=#00FF00>Yes</BASEFONT>", false, false);
-
-            // Cancel button
-            AddButton(180, height - 40, 4017, 4019, 0, GumpButtonType.Reply, 0);
-            AddHtml(215, height - 38, 50, 20, "<BASEFONT COLOR=#FF0000>No</BASEFONT>", false, false);
+            AddButton(180, height - 50, 4020, 4022, 0, GumpButtonType.Reply, 0);
+            AddHtml(215, height - 48, 60, 20, "<BASEFONT COLOR=#FF6B6B>✗ No</BASEFONT>", false, false);
         }
 
         public override void OnResponse(NetState sender, in RelayInfo info)
