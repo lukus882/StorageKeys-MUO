@@ -9,6 +9,7 @@ Universal Storage Keys provides a flexible and extensible storage solution that 
 - **Item Lists**: Store non-stackable items like treasure maps, instruments, seeds, and BODs
 - **Stash Storage**: Store equipment like armor, weapons, clothing, and jewelry with full property preservation
 - **Master Keys**: Combine multiple storage keys into a single management interface
+- **Vendor Stone**: Sell storage keys to players with configurable prices
 
 ## Features
 
@@ -18,6 +19,7 @@ Universal Storage Keys provides a flexible and extensible storage solution that 
 - 🏠 **House Integration**: Keys can be locked down and secured in houses
 - ⚒️ **Craft System Integration**: Automatically withdraws resources during crafting
 - 📋 **Bulk Order Deed Support**: Store and organize small and large BODs
+- 🏪 **Vendor Stone System**: Admin-configurable vendor stone to sell keys to players
 
 ## ModernUO Compatibility
 
@@ -35,6 +37,82 @@ This version has been updated for full compatibility with ModernUO, including:
 - `Quality` enum → `InstrumentQuality`, `ArmorQuality`, `WeaponQuality` (context-specific)
 - `RepairSkillType` → `RepairDeed.RepairSkillType` (nested enum)
 - Various scroll and item type name corrections
+
+---
+
+## Vendor Stone System
+
+The Vendor Stone allows server administrators to sell storage keys to players with fully configurable prices.
+
+### Adding a Vendor Stone
+
+Use the GM command to add a vendor stone:
+```
+[add KeyVendorStone
+```
+
+### Player Features
+
+- **Browse Keys**: Double-click the stone to view available keys
+- **Purchase**: Click on a key to see price and confirm purchase
+- **Payment**: Accepts gold from bank account first, then backpack
+
+### Admin Features (GameMaster+)
+
+When a GM double-clicks the vendor stone, they see the Admin Panel with:
+
+| Feature | Description |
+|---------|-------------|
+| **Toggle Enable/Disable** | Enable or disable individual keys for sale |
+| **Edit Price** | Set custom price for each key |
+| **Set All Prices** | Bulk price modification (fixed, percentage, add/subtract) |
+| **Enable All / Disable All** | Quick bulk enable/disable |
+| **Test Buy** | Get free keys for testing purposes |
+| **View as Player** | Preview the player shopping experience |
+
+### Default Key Prices
+
+| Category | Key | Default Price |
+|----------|-----|---------------|
+| **Resource** | Ingot Key | 10,000 gp |
+| **Resource** | Reagent Key | 10,000 gp |
+| **Resource** | Gem Key | 10,000 gp |
+| **Resource** | Wood Key | 10,000 gp |
+| **Resource** | Granite Key | 10,000 gp |
+| **Resource** | Potion Key | 15,000 gp |
+| **Resource** | Beverage Key | 5,000 gp |
+| **Specialized** | BOD Key | 25,000 gp |
+| **Specialized** | Bard's Key | 15,000 gp |
+| **Specialized** | Scribe's Key | 20,000 gp |
+| **Specialized** | Treasure Hunter's Key | 25,000 gp |
+| **Specialized** | Gardener's Key | 10,000 gp |
+| **Specialized** | Chef's Key | 10,000 gp |
+| **Specialized** | Adventurer's Key | 20,000 gp |
+| **Specialized** | Fish Key | 10,000 gp |
+| **Specialized** | Meat Key | 10,000 gp |
+| **Equipment** | Armor Key | 30,000 gp |
+| **Equipment** | Weapon Key | 30,000 gp |
+| **Equipment** | Clothing Key | 20,000 gp |
+| **Equipment** | Jewelry Key | 25,000 gp |
+| **Equipment** | Armory Key | 50,000 gp |
+| **Crafting** | Smithy Key | 15,000 gp |
+| **Crafting** | Tailor Key | 15,000 gp |
+| **Crafting** | Tool Key | 10,000 gp |
+| **Crafting** | Runic Tool Key | 35,000 gp |
+| **Special** | Power Scroll Key | 50,000 gp |
+| **Special** | Champion Skull Key | 40,000 gp |
+| **Special** | Addon Deed Key | 25,000 gp |
+| **Special** | Jeweler's Key | 15,000 gp |
+| **Special** | Master Storage Key | 100,000 gp |
+
+### Vendor Stone Properties
+
+| Property | Description |
+|----------|-------------|
+| `VendorName` | Display name shown on the stone and gump |
+| `UseGold` | Whether to use gold as currency (default: true) |
+
+---
 
 ## Available Keys
 
@@ -85,6 +163,8 @@ This version has been updated for full compatibility with ModernUO, including:
 | `AddonDeedKey` | Stores Addon Deeds |
 | `MasterItemStoreKey` | Combines multiple keys into one interface |
 
+---
+
 ## Usage
 
 ### Adding Items
@@ -109,16 +189,18 @@ Keys can be locked down in houses and secured with the standard security levels:
 - Friends
 - Anyone
 
+---
+
 ## Installation
 
-1. Copy the `Universal Storage Keys Version 2.0.6` folder to your `Projects/UOContent/CUSTOM/Items/` directory
+1. Copy the `StorageKeys-MUO` folder to your `Projects/UOContent/CUSTOM/Items/` directory
 2. Ensure the folder structure is preserved
 3. Build the project
 
 ## File Structure
 
 ```
-Universal Storage Keys Version 2.0.6/
+StorageKeys-MUO/
 ├── Base Items/
 │   ├── BaseStoreKey.cs      # Base class for all storage keys
 │   └── MasterKey.cs         # Master key implementation
@@ -139,6 +221,11 @@ Universal Storage Keys Version 2.0.6/
 │   └── AddStashColumnGump.cs # Column customization
 ├── Items/
 │   └── [Various Key Files]  # Individual key implementations
+├── Vendor/
+│   ├── KeyVendorStone.cs    # Vendor stone item
+│   ├── KeyVendorEntry.cs    # Vendor entry data class
+│   ├── KeyVendorGump.cs     # Player shopping interface
+│   └── KeyVendorAdminGump.cs # Admin configuration panel
 ├── CliLoc Handler/
 │   ├── Data/                # Localization data handling
 │   └── Gumps/               # Localization viewer gumps
@@ -148,6 +235,8 @@ Universal Storage Keys Version 2.0.6/
 └── Commands/
     └── Commands.cs          # Admin commands
 ```
+
+---
 
 ## Creating Custom Keys
 
@@ -204,6 +293,8 @@ public class MyCustomKey : BaseStoreKey
 }
 ```
 
+---
+
 ## Credits
 
 - Original Universal Storage Keys system design
@@ -216,6 +307,8 @@ public class MyCustomKey : BaseStoreKey
 - Updated all serialization to use interface types
 - Fixed type references for ModernUO API changes
 - Updated ObjectPropertyList handling
+- **NEW**: Vendor Stone system for selling keys to players
+- **NEW**: Admin panel for configuring key prices and availability
 - Code cleanup and optimization
 
 ## License
