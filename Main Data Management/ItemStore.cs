@@ -113,7 +113,7 @@ namespace Solaris.ItemStore
 
         public ItemStore(List<StoreEntry> StoreEntries)
         {
-            _StoreEntries = StoreEntries;
+            _StoreEntries = StoreEntries ?? new List<StoreEntry>();
 
             foreach (StoreEntry entry in _StoreEntries)
             {
@@ -198,17 +198,17 @@ namespace Solaris.ItemStore
 
             //special handling - for a ListEntry object, hitting withdraw is not intended to remove the object, but rather
             //bring up a gump showing the list contained within the ListEntry
-            if (entry is ListEntry)
+            if (entry is ListEntry listEntry)
             {
-                from.SendGump(new ListEntryGump(from,(ListEntry)entry));
+                from.SendGump(new ListEntryGump(from, listEntry));
                 return;
             }
 
             //special handling - for a StashEntry object, hitting withdraw will bring up a gump showing the stash contained
             //within the StashEntry
-            if (entry is StashEntry)
+            if (entry is StashEntry stashEntry)
             {
-                from.SendGump(new StashEntryGump(from,(StashEntry)entry));
+                from.SendGump(new StashEntryGump(from, stashEntry));
                 return;
             }
 
@@ -288,10 +288,7 @@ namespace Solaris.ItemStore
 
             if (!(targeted is Item))
             {
-                if (from != null)
-                {
-                    from.SendMessage("this only works on items.");
-                }
+                from?.SendMessage("this only works on items.");
                 return;
             }
 
@@ -309,21 +306,18 @@ namespace Solaris.ItemStore
             }
 
             //Handle commodity deed insertion
-            if (item is CommodityDeed)
+            if (item is CommodityDeed commodityDeed)
             {
-                if (((CommodityDeed)item).Commodity == null)
+                if (commodityDeed.Commodity == null)
                 {
-                    if (from != null)
-                    {
-                        from.SendMessage("there is nothing to add in that commodity deed.");
-                    }
+                    from?.SendMessage("there is nothing to add in that commodity deed.");
                     return;
                 }
                 //store the deed reference
                 deed = item;
 
                 //reference the commodity within the deed
-                item = ((CommodityDeed)item).Commodity;
+                item = commodityDeed.Commodity;
             }
 
             //this uses the overloadable comparison for the appropriate store entries, so that custom store entries
@@ -332,10 +326,7 @@ namespace Solaris.ItemStore
 
             if (entryindex == -1)
             {
-                if (from != null)
-                {
-                    from.SendMessage("that cannot be stored in this.");
-                }
+                from?.SendMessage("that cannot be stored in this.");
                 return;
             }
 
@@ -344,10 +335,7 @@ namespace Solaris.ItemStore
 
             if (!entry.Add(item))
             {
-                if (from != null)
-                {
-                    from.SendMessage("that quantity cannot fit in this.");
-                }
+                from?.SendMessage("that quantity cannot fit in this.");
                 return;
             }
 
@@ -404,7 +392,7 @@ namespace Solaris.ItemStore
 
         public void FillFromBackpack(Mobile from,bool resendgump)
         {
-            if (from == null || from.Backpack == null)
+            if (from?.Backpack == null)
             {
                 return;
             }
@@ -424,6 +412,11 @@ namespace Solaris.ItemStore
 
         public void FillFromContainer(Container container)
         {
+            if (container == null)
+            {
+                return;
+            }
+            
             //generate a list of all items in the backpack
             List<Item> packitems = RecurseFindItemsInPack(container);
 
@@ -437,65 +430,57 @@ namespace Solaris.ItemStore
         //this checks for any expelled entries due to changes in item structure of any implementing device (eg. keys)
         protected void CheckExpelledEntries(Mobile from)
         {
-            if (ExpelStoreEntries.Count > 0)
+            if (from == null || ExpelStoreEntries.Count == 0)
             {
-                foreach (StoreEntry entry in ExpelStoreEntries)
+                return;
+            }
+            
+            foreach (StoreEntry entry in ExpelStoreEntries)
+            {
+                from.SendMessage("This no longer stores " + entry.Name);
+
+                //special handling:  if this entry is a list entry, then tell the list entry to dump its contents
+                if (entry is ListEntry listentry)
                 {
-                    from.SendMessage("This no longer stores " + entry.Name);
-
-                    //special handling:  if this entry is a list entry, then tell the list entry to dump its contents
-                    if (entry is ListEntry)
+                    while (listentry.ItemListEntries.Count > 0)
                     {
-                        ListEntry listentry = (ListEntry)entry;
+                        Item item = listentry.WithdrawItem(0);
 
-                        while (listentry.ItemListEntries.Count > 0)
+                        if (item != null)
                         {
-                            Item item = listentry.WithdrawItem(0);
-
-                            if (item != null)
-                            {
-                                from.SendMessage("Adding " + entry.Name + " to your backpack.");
-                                from.Backpack.DropItem(item);
-                            }
+                            from.SendMessage("Adding " + entry.Name + " to your backpack.");
+                            from.Backpack?.DropItem(item);
                         }
-                    }
-                    else
-                    {
-                        while (entry.Amount > 0)
-                        {
-                            int towithdraw = entry.Amount;
-                            Item item = entry.Withdraw(ref towithdraw,true);
-
-                            if (item != null)
-                            {
-                                from.Backpack.DropItem(item);
-                            }
-                        }
-                        from.SendMessage("Adding " + entry.Name + " to your backpack.");
                     }
                 }
+                else
+                {
+                    while (entry.Amount > 0)
+                    {
+                        int towithdraw = entry.Amount;
+                        Item item = entry.Withdraw(ref towithdraw,true);
 
-                //wipe the list
-                _ExpelStoreEntries = new List<StoreEntry>();
+                        if (item != null)
+                        {
+                            from.Backpack?.DropItem(item);
+                        }
+                    }
+                    from.SendMessage("Adding " + entry.Name + " to your backpack.");
+                }
             }
+
+            //wipe the list
+            _ExpelStoreEntries = new List<StoreEntry>();
         }
 
         //this checks if the person using this store has a gump open for it.
         public void RefreshParentGump()
         {
             //if the object containing this store is an item
-            if (Owner != null && Owner is Item)
+            if (Owner is Item item && item.RootParent is Mobile player)
             {
-                Item item = (Item)Owner;
-
-                //if the item is being held by a mobile
-                if (item.RootParent is Mobile)
-                {
-                    Mobile player = (Mobile)item.RootParent;
-
-                    //perform a refresh operation on their gump if this store is being displayed 
-                    ItemStoreGump.RefreshGump(player,this);
-                }
+                //perform a refresh operation on their gump if this store is being displayed 
+                ItemStoreGump.RefreshGump(player,this);
             }
         }
 
@@ -566,9 +551,6 @@ namespace Solaris.ItemStore
 
                     templist.RemoveAt(matchingindex);
                 }
-                else
-                {
-                }
 
                 //add this to the finished product list
                 _StoreEntries.Add(entry);
@@ -600,9 +582,12 @@ namespace Solaris.ItemStore
 
         public void Dispose()
         {
-            foreach (StoreEntry entry in _StoreEntries)
+            if (_StoreEntries != null)
             {
-                entry.Dispose();
+                foreach (StoreEntry entry in _StoreEntries)
+                {
+                    entry.Dispose();
+                }
             }
         }
 
@@ -637,7 +622,7 @@ namespace Solaris.ItemStore
             foreach (StoreEntry entry in StoreEntries)
             {
                 //write the type so we know what kind to rebuild next time
-                writer.Write(entry.GetType().Name);
+                writer.Write(entry.GetType().FullName);
 
                 //perform type-specific serialization
                 entry.Serialize(writer);
@@ -648,7 +633,7 @@ namespace Solaris.ItemStore
 
             foreach (StoreEntry entry in ExpelStoreEntries)
             {
-                writer.Write(entry.GetType().Name);
+                writer.Write(entry.GetType().FullName);
 
                 entry.Serialize(writer);
             }
@@ -692,36 +677,82 @@ namespace Solaris.ItemStore
                         int entrycount = reader.ReadInt();
 
                         //read in the active items
-                        if (entrycount > 0)
+                        _StoreEntries = new List<StoreEntry>(entrycount);
+                        
+                        for (int i = 0; i < entrycount; i++)
                         {
-                            for (int i = 0; i < entrycount; i++)
+                            string typeName = reader.ReadString();
+                            
+                            try
                             {
-                                //dynamically create store entries, ore derived ones, based on the type name stored in the serial data, then add it to the serial data reader
-
-                                //WARNING... this is very delicate!!  if an improper type name was saved to the serial data (eg. if a tool or resource used to belong to a tool, and was removed from the shard) then an exception will be thrown here.
-                                //be sure to remove any and all tool types from keys, and cycle a world load/save before taking that class out
-
-                                StoreEntry entry = (StoreEntry)Activator.CreateInstance(AssemblyHandler.FindTypeByName(reader.ReadString()),new object[] { reader });
-
-                                //register this store with the entry for refresh purposes
-                                entry.Store = this;
-                                StoreEntries.Add(entry);
+                                Type entryType = AssemblyHandler.FindTypeByFullName(typeName) 
+                                    ?? AssemblyHandler.FindTypeByName(typeName);
+                                
+                                if (entryType != null)
+                                {
+                                    StoreEntry entry = (StoreEntry)Activator.CreateInstance(entryType, new object[] { reader });
+                                    entry.Store = this;
+                                    StoreEntries.Add(entry);
+                                }
+                                else
+                                {
+                                    // Type not found - create a placeholder to read the data and discard
+                                    Console.WriteLine($"[StorageKeys] Warning: Entry type '{typeName}' not found, skipping entry.");
+                                    // Read base StoreEntry data to keep stream position correct
+                                    var placeholder = new StoreEntry(reader);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"[StorageKeys] Error deserializing entry type '{typeName}': {ex.Message}");
+                                // Try to read base data to maintain stream position
+                                try
+                                {
+                                    var placeholder = new StoreEntry(reader);
+                                }
+                                catch
+                                {
+                                    // Stream may be corrupted at this point
+                                }
                             }
                         }
 
                         //read in the expelled items
-
                         entrycount = reader.ReadInt();
+                        _ExpelStoreEntries = new List<StoreEntry>(entrycount);
 
-                        if (entrycount > 0)
+                        for (int i = 0; i < entrycount; i++)
                         {
-                            for (int i = 0; i < entrycount; i++)
+                            string typeName = reader.ReadString();
+                            
+                            try
                             {
-                                StoreEntry entry = (StoreEntry)Activator.CreateInstance(AssemblyHandler.FindTypeByName(reader.ReadString()),new object[] { reader });
-                                //register this store with the entry for refresh purposes
-                                entry.Store = this;
-
-                                ExpelStoreEntries.Add(entry);
+                                Type entryType = AssemblyHandler.FindTypeByFullName(typeName) 
+                                    ?? AssemblyHandler.FindTypeByName(typeName);
+                                
+                                if (entryType != null)
+                                {
+                                    StoreEntry entry = (StoreEntry)Activator.CreateInstance(entryType, new object[] { reader });
+                                    entry.Store = this;
+                                    ExpelStoreEntries.Add(entry);
+                                }
+                                else
+                                {
+                                    Console.WriteLine($"[StorageKeys] Warning: Expelled entry type '{typeName}' not found, skipping.");
+                                    var placeholder = new StoreEntry(reader);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"[StorageKeys] Error deserializing expelled entry '{typeName}': {ex.Message}");
+                                try
+                                {
+                                    var placeholder = new StoreEntry(reader);
+                                }
+                                catch
+                                {
+                                    // Stream may be corrupted
+                                }
                             }
                         }
                         break;
@@ -735,28 +766,33 @@ namespace Solaris.ItemStore
         {
             List<Item> items = new List<Item>();
 
+            if (c == null)
+            {
+                return items;
+            }
+
             foreach (Item item in c.Items)
             {
                 //if the item is a container
-                if (item is Container)
+                if (item is Container container)
                 {
                     //check if it can be trapped
-                    if (item is TrappableContainer)
+                    if (container is TrappableContainer trappable)
                     {
                         //if there's a trap on the container, ignore the container and move on
-                        if (((TrappableContainer)item).TrapType != TrapType.None)
+                        if (trappable.TrapType != TrapType.None)
                         {
                             continue;
                         }
 
                         //if it's not trapped but is also lockable and is locked, ignore the container and move on
-                        if (item is LockableContainer && ((LockableContainer)item).Locked)
+                        if (container is LockableContainer lockable && lockable.Locked)
                         {
                             continue;
                         }
                     }
                     //otherwise, recursively find items from this container
-                    items.AddRange(RecurseFindItemsInPack((Container)item));
+                    items.AddRange(RecurseFindItemsInPack(container));
                 }
                 else    //it's not a container, so try to add to keys
                 {
@@ -769,6 +805,11 @@ namespace Solaris.ItemStore
         //this produces a clone of the specified ItemStore
         public static ItemStore Clone(ItemStore store)
         {
+            if (store == null)
+            {
+                return null;
+            }
+            
             //create a new itemstore and populate its store entry list with a clone of the store entry list belonging to the source store
             ItemStore newstore = new ItemStore(StoreEntry.CloneList(store.StoreEntries));
 
@@ -788,7 +829,7 @@ namespace Solaris.ItemStore
             //this is reset to the new containing object after the cloning process is complete.
             newstore.Owner = store.Owner;
 
-            foreach (StoreEntry entry in store.StoreEntries)
+            foreach (StoreEntry entry in newstore.StoreEntries)
             {
                 entry.Store = newstore;
             }

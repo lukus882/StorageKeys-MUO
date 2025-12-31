@@ -15,6 +15,10 @@ namespace Server.Items
     //this is the parent class and main functionality for all item storage keys
     public class BaseStoreKey : Item, IItemStoreObject, ISecurable
     {
+        // Constants for magic numbers
+        public const int MinToolWithdraw = 50;      // Minimum uses to withdraw for tools (prevents vendor exploit)
+        public const int MaxStackAmount = 60000;    // Maximum amount for stacked items (UO client limit)
+        
         //Addition April 2009: this will make entries like potions and beverages leave an empty container behind when emptied, and require a container to fill into
         public static bool EmptyContents { get { return true; } }
 
@@ -27,17 +31,28 @@ namespace Server.Items
         public virtual bool CanUseFromPack { get { return true; } }
         public virtual bool CanUseFromHouse { get { return true; } }
 
-        //this is handy when withdrawing items - it holds a reference to the item withdrawn
-        protected static Item _LastWithdrawn;
-
-        //this is used to read for the amount in the keys without withdrawing them.  Used for food crafting
-        protected static int _LastAmountCount;
+        // Thread-safe storage for last withdrawn item using ThreadLocal
+        [ThreadStatic]
+        private static Item _lastWithdrawn;
+        
+        [ThreadStatic]
+        private static int _lastAmountCount;
 
         protected SecureLevel _SecureLevel;
 
         public SecureLevel Level { get { return _SecureLevel; } set { _SecureLevel = value; } }
 
-        public static Item LastWithdrawn { get { return _LastWithdrawn; } }
+        public static Item LastWithdrawn 
+        { 
+            get => _lastWithdrawn; 
+            private set => _lastWithdrawn = value; 
+        }
+        
+        public static int LastAmountCount 
+        { 
+            get => _lastAmountCount; 
+            private set => _lastAmountCount = value; 
+        }
 
         //this is the non-static accessor for the entry structure info, so it can access the nonstatic overloaded functions in each child class
         public virtual List<StoreEntry> EntryStructure
@@ -81,9 +96,6 @@ namespace Server.Items
             Hue = hue;
             Weight = 1;
         }
-
-        //TODO: fix column number munching with master keys
-        //TODO: fix connection breaking with listentry when withdrawn from masterkey
 
         //serial constructor
         public BaseStoreKey(Serial serial) : base(serial)
@@ -280,7 +292,7 @@ namespace Server.Items
 
         public override void OnDelete()
         {
-            _Store.Dispose();
+            _Store?.Dispose();
         }
 
         public override void Serialize(IGenericWriter writer)
@@ -349,14 +361,22 @@ namespace Server.Items
         //this handles a distributed search and take operation
         public static bool Consume(Container pack, Type[] types, int[] amounts)
         {
-            //check if there are any BaseStoreKey or MasterItemStoreKey objects in the caster's backpack
-            var keysources = new List<Item>();
-            foreach (var item in pack.FindItemsByType(new Type[] { typeof(BaseStoreKey), typeof(MasterItemStoreKey) }))
+            if (pack == null || types == null || amounts == null)
             {
-                keysources.Add(item);
+                return false;
             }
 
-            if (keysources.Count == 0 || types == null || amounts == null)
+            //check if there are any BaseStoreKey or MasterItemStoreKey objects in the caster's backpack
+            var keyTypes = new Type[] { typeof(BaseStoreKey), typeof(MasterItemStoreKey) };
+            int keyCount = 0;
+            
+            // Count keys first without creating a list
+            foreach (var _ in pack.FindItemsByType(keyTypes))
+            {
+                keyCount++;
+            }
+
+            if (keyCount == 0)
             {
                 return false;
             }
@@ -373,13 +393,13 @@ namespace Server.Items
             List<StoreEntry> consumeentries = new List<StoreEntry>();
 
             //go thru the list of found objects
-            foreach (Item key in keysources)
+            foreach (Item key in pack.FindItemsByType(keyTypes))
             {
                 //utilizes IItemStoreObject interface function, defined by keys
-                if (key is IItemStoreObject)
+                if (key is IItemStoreObject storeObject)
                 {
                     //scan this object for any usable candidates to withdraw from
-                    consumeentries.AddRange(((IItemStoreObject)key).FindConsumableEntries(types, amounts, ref foundentries));
+                    consumeentries.AddRange(storeObject.FindConsumableEntries(types, amounts, ref foundentries));
 
                     //check if we're done
                     if (consumeentries.Count == types.Length)
@@ -398,17 +418,10 @@ namespace Server.Items
                     if (!foundentries[i])
                     {
                         //find any item, and check if there's enough to consume
-                        var items = new List<Item>();
+                        int total = 0;
                         foreach (var item in pack.FindItemsByType(types[i]))
                         {
-                            items.Add(item);
-                        }
-
-                        int total = 0;
-
-                        for (int j = 0; j < items.Count; j++)
-                        {
-                            total += items[j].Amount;
+                            total += item.Amount;
                         }
 
                         //make sure the total found is sufficient
@@ -431,7 +444,7 @@ namespace Server.Items
 
             //if we found everything we need, then consume them
 
-            //perform the consumption from backpack
+            //perform the consumption from keys
             foreach (StoreEntry entry in consumeentries)
             {
                 entry.Consume();
@@ -487,32 +500,27 @@ namespace Server.Items
 
         public static bool CraftWithdraw(Container pack, Type[] types, int amount, bool getamountonly)
         {
-            //check if there are any BaseStoreKey or MasterItemStoreKey objects in the caster's backpack
-            var keysources = new List<Item>();
-            foreach (var item in pack.FindItemsByType(new Type[] { typeof(BaseStoreKey), typeof(MasterItemStoreKey) }))
-            {
-                keysources.Add(item);
-            }
-
-            if (keysources.Count == 0 || types == null || amount == 0)
+            if (pack == null || types == null || amount == 0)
             {
                 return false;
             }
 
+            var keyTypes = new Type[] { typeof(BaseStoreKey), typeof(MasterItemStoreKey) };
+
             //go thru the list of found objects
-            foreach (Item key in keysources)
+            foreach (Item key in pack.FindItemsByType(keyTypes))
             {
                 //utilizes IItemStoreObject interface function, defined by keys
-                if (key is IItemStoreObject)
+                if (key is IItemStoreObject storeObject)
                 {
                     //scan this object for any usable candidates to withdraw from
-                    StoreEntry entry = ((IItemStoreObject)key).FindConsumableEntry(types, amount);
+                    StoreEntry entry = storeObject.FindConsumableEntry(types, amount);
 
                     if (entry != null)
                     {
                         if (getamountonly)
                         {
-                            _LastAmountCount = entry.Amount;
+                            LastAmountCount = entry.Amount;
                         }
                         else if (entry.Amount < amount)
                         {
@@ -523,9 +531,6 @@ namespace Server.Items
                         {
                             //if a valid entry was found, withdraw it to the container
 
-                            Console.WriteLine("trying to withdraw " + amount.ToString());
-                            //doesn't work properly with unstackable items
-
                             //store the amount that needs to be withdrawn, and reset the amount that has been withdrawn
                             int amounttowithdraw = amount;
                             int amountwithdrawn = 0;
@@ -535,7 +540,7 @@ namespace Server.Items
                             {
                                 amount = amounttowithdraw - amountwithdrawn;
 
-                                _LastWithdrawn = entry.Withdraw(ref amount);
+                                LastWithdrawn = entry.Withdraw(ref amount);
 
                                 amountwithdrawn += amount;
 
@@ -544,7 +549,11 @@ namespace Server.Items
                                 {
                                     return false;
                                 }
-                                pack.AddItem(_LastWithdrawn);
+                                
+                                if (LastWithdrawn != null)
+                                {
+                                    pack.AddItem(LastWithdrawn);
+                                }
                             }
                             entry.RefreshParentGump();
                         }
@@ -562,7 +571,7 @@ namespace Server.Items
         {
             if (CraftWithdraw(pack,types,amount,true))
             {
-                return _LastAmountCount;
+                return LastAmountCount;
             }
             return 0;
         }
@@ -570,26 +579,21 @@ namespace Server.Items
         //this is used to withdraw based on a particular store entry, and specified parameters
         public static Item WithdrawByEntryType(Container pack, Type entrytype, int amount, object[] parameters)
         {
-            //check if there are any BaseStoreKey or MasterItemStoreKey objects in the caster's backpack
-            var keysources = new List<Item>();
-            foreach (var item in pack.FindItemsByType(new Type[] { typeof(BaseStoreKey), typeof(MasterItemStoreKey) }))
-            {
-                keysources.Add(item);
-            }
-
-            if (keysources.Count == 0 || amount == 0)
+            if (pack == null || amount == 0)
             {
                 return null;
             }
 
+            var keyTypes = new Type[] { typeof(BaseStoreKey), typeof(MasterItemStoreKey) };
+
             //go thru the list of found objects
-            foreach (Item key in keysources)
+            foreach (Item key in pack.FindItemsByType(keyTypes))
             {
                 //utilizes IItemStoreObject interface function, defined by keys
-                if (key is IItemStoreObject)
+                if (key is IItemStoreObject storeObject)
                 {
                     //scan this object for any usable candidates to withdraw from
-                    StoreEntry entry = ((IItemStoreObject)key).FindEntryByEntryType(entrytype, amount, parameters);
+                    StoreEntry entry = storeObject.FindEntryByEntryType(entrytype, amount, parameters);
 
                     if (entry != null)
                     {
@@ -597,7 +601,10 @@ namespace Server.Items
 
                         entry.RefreshParentGump();
 
-                        pack.AddItem(_LastWithdrawn);
+                        if (LastWithdrawn != null)
+                        {
+                            pack.AddItem(LastWithdrawn);
+                        }
 
                         return item;
                     }
@@ -609,15 +616,13 @@ namespace Server.Items
 
         public static void StoreAt(Item source,Item toplace)
         {
-            if (source.Parent != null)
+            if (source?.Parent is Container container)
             {
-                Container container = (Container)source.Parent;
-
                 container.DropItem(toplace);
                 toplace.X = source.X;
                 toplace.Y = source.Y;
             }
-            else
+            else if (source != null)
             {
                 toplace.MoveToWorld(source.Location,source.Map);
                 if (!source.Movable)

@@ -262,7 +262,7 @@ namespace Solaris.ItemStore
 
             //limit the amount to withdraw by the amount stored in the entry
             //the most Amount you can properly have a stacked item is 60k units.  Otherwise, drag/drop gets messed up
-            int towithdraw = Math.Min(Math.Min(amount,_Amount),60000);
+            int towithdraw = Math.Min(Math.Min(amount,_Amount), BaseStoreKey.MaxStackAmount);
 
             try
             {
@@ -351,17 +351,10 @@ namespace Solaris.ItemStore
         public virtual void Serialize(IGenericWriter writer)
         {
             //version
-            writer.Write(0);
+            writer.Write(1);
 
-            //store type by string, and recover it by reflection
-            if (_Type != null)
-            {
-                writer.Write(_Type.Name);
-            }
-            else
-            {
-                writer.Write((string)null);
-            }
+            //store type by full name for better resolution
+            writer.Write(_Type?.FullName);
 
             writer.Write(_Name);
 
@@ -377,7 +370,7 @@ namespace Solaris.ItemStore
 
                 for (int i = 0; i < _AlternateTypes.Length; i++)
                 {
-                    writer.Write(AlternateTypes[i].Name);
+                    writer.Write(AlternateTypes[i]?.FullName);
                 }
             }
             else
@@ -390,14 +383,13 @@ namespace Solaris.ItemStore
         {
             int version = reader.ReadInt();
 
-            //persists because it is useful when doing error checking.
-            string typename;
+            string typename = null;
 
             switch (version)
             {
-                case 0:
-                default:
+                case 1:
                     {
+                        // Version 1: Uses FullName for types
                         typename = reader.ReadString();
                         _Name = reader.ReadString();
                         _Amount = reader.ReadInt();
@@ -415,32 +407,58 @@ namespace Solaris.ItemStore
                             for (int i = 0; i < alternatetypecount; i++)
                             {
                                 string alttypename = reader.ReadString();
-                                try
+                                if (!string.IsNullOrEmpty(alttypename))
                                 {
-                                    AlternateTypes[i] = AssemblyHandler.FindTypeByName(alttypename);
-                                }
-                                catch
-                                {
+                                    // Try FullName first, then simple name
+                                    AlternateTypes[i] = AssemblyHandler.FindTypeByFullName(alttypename) 
+                                        ?? AssemblyHandler.FindTypeByName(alttypename);
                                 }
                             }
                         }
+                        break;
+                    }
+                case 0:
+                default:
+                    {
+                        // Version 0: Uses simple Name for types (legacy)
+                        typename = reader.ReadString();
+                        _Name = reader.ReadString();
+                        _Amount = reader.ReadInt();
 
+                        _Height = reader.ReadInt();
+                        _X = reader.ReadInt();
+                        _Y = reader.ReadInt();
+
+                        int alternatetypecount = reader.ReadInt();
+
+                        if (alternatetypecount > 0)
+                        {
+                            _AlternateTypes = new Type[alternatetypecount];
+
+                            for (int i = 0; i < alternatetypecount; i++)
+                            {
+                                string alttypename = reader.ReadString();
+                                if (!string.IsNullOrEmpty(alttypename))
+                                {
+                                    AlternateTypes[i] = AssemblyHandler.FindTypeByName(alttypename);
+                                }
+                            }
+                        }
                         break;
                     }
             }
 
-            try
+            // Resolve the main type
+            if (!string.IsNullOrEmpty(typename))
             {
-                _Type = AssemblyHandler.FindTypeByName(typename);
-            }
-            catch
-            {
-            }
-
-            //null type handler
-            if (_Type == null)
-            {
-                //TODO: define this better
+                // Try FullName first (version 1+), then simple name (legacy)
+                _Type = AssemblyHandler.FindTypeByFullName(typename) 
+                    ?? AssemblyHandler.FindTypeByName(typename);
+                
+                if (_Type == null)
+                {
+                    Console.WriteLine($"[StorageKeys] Warning: Could not resolve type '{typename}'");
+                }
             }
         }//deserialize
 
@@ -839,14 +857,13 @@ namespace Solaris.ItemStore
 
         public override Item Withdraw(ref int amount,bool makedeed)
         {
-            //force it so you cannot withdraw less than 50 uses on a tool
+            //force it so you cannot withdraw less than minimum uses on a tool
             //this removes the ability to exploit selling 1-use tools to vendors for gold farming
-            int towithdraw = Math.Min(Math.Max(50,amount),_Amount);
+            int towithdraw = Math.Min(Math.Max(BaseStoreKey.MinToolWithdraw, amount), _Amount);
 
-            //TODO: find a way to access this number from item store..  50 is hardcoded here, but should be set by the implementing object
-            if (_Amount - towithdraw < 50)
+            //if the amount to be left behind is less than minimum uses remaining, then force the keys to withdraw all that's left
+            if (_Amount - towithdraw < BaseStoreKey.MinToolWithdraw)
             {
-                //if the amount to be left behind is less than 50 uses remaining, then force the keys to withdraw all that's left
                 towithdraw = _Amount;
             }
 
@@ -1086,7 +1103,7 @@ namespace Solaris.ItemStore
                 return false;
             }
 
-            //don't add insured/blessed items
+            //don't add insured/blessed tools
             if (item.LootType != LootType.Regular || item.Insured)
             {
                 return false;
@@ -1291,9 +1308,9 @@ namespace Solaris.ItemStore
 
         public override Item Withdraw(ref int amount,bool makedeed)
         {
-            //force it so you cannot withdraw less than 50 uses on a tool
+            //force it so you cannot withdraw less than minimum uses on a tool
             //this removes the ability to exploit selling 1-use tools to vendors for gold farming
-            int towithdraw = Math.Min(Math.Max(50,amount),_Amount);
+            int towithdraw = Math.Min(Math.Max(BaseStoreKey.MinToolWithdraw,amount),_Amount);
 
             //this removes the ability to exploit selling 1-use tools to vendors for gold farming
 
@@ -1538,10 +1555,6 @@ namespace Solaris.ItemStore
     //Ancient Smithy Hammer Tool entry class - handles runic tools
     public class AncientSmithyHammerToolEntry : StoreEntry
     {
-        public override int ButtonID { get { return 0x9A8; } }
-        public override int ButtonX { get { return 5; } }
-        public override int ButtonY { get { return -3; } }
-
         //reference to the skill bonus
         protected int _Bonus;
 
@@ -1601,11 +1614,9 @@ namespace Solaris.ItemStore
 
         public override Item Withdraw(ref int amount,bool makedeed)
         {
-            //force it so you cannot withdraw less than 50 uses on a tool
+            //force it so you cannot withdraw less than minimum uses on a tool
             //this removes the ability to exploit selling 1-use tools to vendors for gold farming
-            int towithdraw = Math.Min(Math.Max(50,amount),_Amount);
-
-            //this removes the ability to exploit selling 1-use tools to vendors for gold farming
+            int towithdraw = Math.Min(Math.Max(BaseStoreKey.MinToolWithdraw,amount),_Amount);
 
             try
             {
@@ -2133,7 +2144,7 @@ namespace Solaris.ItemStore
 
                 beverage.Content = _BeverageType;
 
-                //force them to withdraw as much as possible, so they can't exploit mass prduction of items				
+                //force them to withdraw as much as possible, so they can't exploit mass production of items				
                 int towithdraw = Math.Min(_Amount,beverage.MaxQuantity);
 
                 if (forcequantity)
@@ -2152,7 +2163,7 @@ namespace Solaris.ItemStore
             {
             }
 
-            return null; ;
+            return null;
         }
 
         public override Item WithdrawTo(ref int amount,Item destination)
@@ -2162,10 +2173,8 @@ namespace Solaris.ItemStore
                 return null;
             }
 
-            if (destination is BaseBeverage)
+            if (destination is BaseBeverage beverage)
             {
-                BaseBeverage beverage = (BaseBeverage)destination;
-
                 beverage.Content = _BeverageType;
 
                 amount = Math.Min(Math.Min(amount,_Amount),beverage.MaxQuantity - beverage.Quantity);
@@ -2183,7 +2192,7 @@ namespace Solaris.ItemStore
         //all its entries to find one that matches
         public override bool Match(Item item,bool checksubtypes)
         {
-            if (item is BaseBeverage && ((BaseBeverage)item).Content == _BeverageType)
+            if (item is BaseBeverage beverage && beverage.Content == _BeverageType)
             {
                 return true;
             }
@@ -2201,21 +2210,25 @@ namespace Solaris.ItemStore
                 return false;
             }
 
-            //if the specified parameter search is invalid, or does not match this potion entry's effect
+            //if the specified parameter search is invalid, or does not match this beverage entry's effect
             if (parameters.Length == 0)
             {
                 return false;
             }
 
-            if (!(parameters[0] is BeverageType))
+            if (!(parameters[0] is BeverageType[]))
             {
                 return false;
             }
 
-            //check if there is a match
-            if (((BeverageType)parameters[0]) == BeverageType)
+            //look down the list of effects provided
+            foreach (BeverageType type in ((BeverageType[])parameters[0]))
             {
-                return true;
+                //check if there is a match
+                if (type == BeverageType)
+                {
+                    return true;
+                }
             }
 
             //otherwise, return false for nothing found
@@ -2337,7 +2350,7 @@ namespace Solaris.ItemStore
                 return false;
             }
 
-            //dont' add slayer instruments to this
+            //don't add slayer instruments to this
             if (instrument.Slayer != SlayerName.None || instrument.Slayer2 != SlayerName.None)
             {
                 return false;
@@ -2388,7 +2401,7 @@ namespace Solaris.ItemStore
             {
             }
 
-            return null; ;
+            return null;
         }
 
         //this handles the check to see if the requested item matches this entry.  This is used when an item store is checking thru
@@ -2408,7 +2421,6 @@ namespace Solaris.ItemStore
         public override bool Match(int amount,object[] parameters)
         {
             //this is unused for this type.
-
             return false;
         }
 

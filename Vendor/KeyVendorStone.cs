@@ -51,53 +51,72 @@ namespace Server.Items
         {
         }
 
+        /// <summary>
+        /// Safely adds a key entry only if the type exists
+        /// </summary>
+        private void TryAddKeyEntry(string typeName, string displayName, int price, int itemId = 0x176B, int hue = 0)
+        {
+            Type keyType = AssemblyHandler.FindTypeByName(typeName);
+            if (keyType != null)
+            {
+                _entries.Add(new KeyVendorEntry(keyType, displayName, price, itemId, hue));
+            }
+            else
+            {
+                Console.WriteLine($"[KeyVendorStone] Warning: Key type '{typeName}' not found, skipping.");
+            }
+        }
+
         private void InitializeDefaultKeys()
         {
             // Resource Keys
-            _entries.Add(new KeyVendorEntry(typeof(IngotKey), "Ingot Key", 10000, 0x176B, 0));
-            _entries.Add(new KeyVendorEntry(typeof(ReagentKey), "Reagent Key", 10000, 0x176B, 0));
-            _entries.Add(new KeyVendorEntry(typeof(GemKey), "Gem Key", 10000, 0x176B, 0));
-            _entries.Add(new KeyVendorEntry(typeof(WoodKey), "Wood Key", 10000, 0x176B, 0));
-            _entries.Add(new KeyVendorEntry(typeof(GraniteKey), "Granite Key", 10000, 0x176B, 0));
-            _entries.Add(new KeyVendorEntry(typeof(PotionKey), "Potion Key", 15000, 0x176B, 0));
-            _entries.Add(new KeyVendorEntry(typeof(BeverageKey), "Beverage Key", 5000, 0x176B, 0));
+            TryAddKeyEntry("IngotKey", "Ingot Key", 10000, 0x176B, 0);
+            TryAddKeyEntry("ReagentKey", "Reagent Key", 10000, 0x176B, 0);
+            TryAddKeyEntry("GemKey", "Gem Key", 10000, 0x176B, 0);
+            TryAddKeyEntry("WoodKey", "Wood Key", 10000, 0x176B, 0);
+            TryAddKeyEntry("GraniteKey", "Granite Key", 10000, 0x176B, 0);
+            TryAddKeyEntry("PotionKey", "Potion Key", 15000, 0x176B, 0);
+            TryAddKeyEntry("BeverageKey", "Beverage Key", 5000, 0x176B, 0);
 
             // Specialized Keys
-            _entries.Add(new KeyVendorEntry(typeof(BODKey), "BOD Key", 25000, 0x176B, 0));
-            _entries.Add(new KeyVendorEntry(typeof(BardsKey), "Bard's Key", 15000, 0xEB6, 0));
-            _entries.Add(new KeyVendorEntry(typeof(ScribesKey), "Scribe's Key", 20000, 0x176B, 0));
-            _entries.Add(new KeyVendorEntry(typeof(TreasureHuntersKey), "Treasure Hunter's Key", 25000, 0x176B, 0));
-            _entries.Add(new KeyVendorEntry(typeof(GardenersKey), "Gardener's Key", 10000, 0xFB7, 0));
-            _entries.Add(new KeyVendorEntry(typeof(ChefKey), "Chef's Key", 10000, 0x9ED, 0));
-            _entries.Add(new KeyVendorEntry(typeof(AdventurerKey), "Adventurer's Key", 20000, 0x176B, 0));
-            _entries.Add(new KeyVendorEntry(typeof(FishKey), "Fish Key", 10000, 0xFFA, 0));
-            _entries.Add(new KeyVendorEntry(typeof(MeatKey), "Meat Key", 10000, 0x176B, 0));
+            TryAddKeyEntry("BODKey", "BOD Key", 25000, 0x176B, 0);
+            TryAddKeyEntry("BardsKey", "Bard's Key", 15000, 0xEB6, 0);
+            TryAddKeyEntry("ScribesKey", "Scribe's Key", 20000, 0x176B, 0);
+            TryAddKeyEntry("TreasureHuntersKey", "Treasure Hunter's Key", 25000, 0x176B, 0);
+            TryAddKeyEntry("GardenersKey", "Gardener's Key", 10000, 0xFB7, 0);
+            TryAddKeyEntry("ChefKey", "Chef's Key", 10000, 0x9ED, 0);
+            TryAddKeyEntry("AdventurerKey", "Adventurer's Key", 20000, 0x176B, 0);
+            TryAddKeyEntry("FishKey", "Fish Key", 10000, 0xFFA, 0);
+            TryAddKeyEntry("MeatKey", "Meat Key", 10000, 0x176B, 0);
 
             // Equipment Keys
-            _entries.Add(new KeyVendorEntry(typeof(ArmorKey), "Armor Key", 30000, 0x176B, 0));
-            _entries.Add(new KeyVendorEntry(typeof(WeaponKey), "Weapon Key", 30000, 0x176B, 0));
-            _entries.Add(new KeyVendorEntry(typeof(ClothingKey), "Clothing Key", 20000, 0x176B, 0));
-            _entries.Add(new KeyVendorEntry(typeof(JewelryKey), "Jewelry Key", 25000, 0x176B, 0));
-            _entries.Add(new KeyVendorEntry(typeof(ArmoryKey), "Armory Key", 50000, 0x3D86, 0));
+            TryAddKeyEntry("ArmorKey", "Armor Key", 30000, 0x176B, 0);
+            TryAddKeyEntry("WeaponKey", "Weapon Key", 30000, 0x176B, 0);
+            TryAddKeyEntry("ClothingKey", "Clothing Key", 20000, 0x176B, 0);
+            TryAddKeyEntry("JewelryKey", "Jewelry Key", 25000, 0x176B, 0);
+            TryAddKeyEntry("ArmoryKey", "Armory Key", 50000, 0x3D86, 0);
 
             // Crafting Keys
-            _entries.Add(new KeyVendorEntry(typeof(SmithyKey), "Smithy Key", 15000, 0x176B, 0));
-            _entries.Add(new KeyVendorEntry(typeof(TailorKey), "Tailor Key", 15000, 0x176B, 0));
-            _entries.Add(new KeyVendorEntry(typeof(ToolKey), "Tool Key", 10000, 0x176B, 0));
-            _entries.Add(new KeyVendorEntry(typeof(RunicToolKey), "Runic Tool Key", 35000, 0x176B, 0));
+            TryAddKeyEntry("SmithyKey", "Smithy Key", 15000, 0x176B, 0);
+            TryAddKeyEntry("TailorKey", "Tailor Key", 15000, 0x176B, 0);
+            TryAddKeyEntry("ToolKey", "Tool Key", 10000, 0x176B, 0);
+            TryAddKeyEntry("RunicToolKey", "Runic Tool Key", 35000, 0x176B, 0);
 
             // Special Keys
-            _entries.Add(new KeyVendorEntry(typeof(PSKey), "Power Scroll Key", 50000, 0x176B, 0));
-            _entries.Add(new KeyVendorEntry(typeof(ChampSkullKey), "Champion Skull Key", 40000, 0x2203, 0));
-            _entries.Add(new KeyVendorEntry(typeof(AddonDeedKey), "Addon Deed Key", 25000, 0x176B, 0));
-            _entries.Add(new KeyVendorEntry(typeof(JewelersKey), "Jeweler's Key", 15000, 0x176B, 0));
+            TryAddKeyEntry("PSKey", "Power Scroll Key", 50000, 0x176B, 0);
+            TryAddKeyEntry("ChampSkullKey", "Champion Skull Key", 40000, 0x2203, 0);
+            TryAddKeyEntry("AddonDeedKey", "Addon Deed Key", 25000, 0x176B, 0);
+            TryAddKeyEntry("JewelersKey", "Jeweler's Key", 15000, 0x176B, 0);
 
             // Master Key - most expensive
-            _entries.Add(new KeyVendorEntry(typeof(MasterItemStoreKey), "Master Storage Key", 100000, 0x176B, 1153));
+            TryAddKeyEntry("MasterItemStoreKey", "Master Storage Key", 100000, 0x176B, 1153);
         }
 
         public override void OnDoubleClick(Mobile from)
         {
+            if (from == null)
+                return;
+                
             if (!from.InRange(GetWorldLocation(), 3))
             {
                 from.SendLocalizedMessage(500446); // That is too far away.
@@ -137,6 +156,9 @@ namespace Server.Items
 
         public bool TryPurchase(Mobile from, KeyVendorEntry entry)
         {
+            if (from == null)
+                return false;
+                
             if (entry == null || !entry.Enabled)
             {
                 from.SendMessage("That key is not available for purchase.");
@@ -244,7 +266,16 @@ namespace Server.Items
             _entries = new List<KeyVendorEntry>(count);
             for (int i = 0; i < count; i++)
             {
-                _entries.Add(new KeyVendorEntry(reader));
+                var entry = new KeyVendorEntry(reader);
+                // Only add if the key type is valid
+                if (entry.KeyType != null)
+                {
+                    _entries.Add(entry);
+                }
+                else
+                {
+                    Console.WriteLine($"[KeyVendorStone] Warning: Skipping entry with invalid key type '{entry.Name}'");
+                }
             }
         }
     }
